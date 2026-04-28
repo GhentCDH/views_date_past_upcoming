@@ -1,0 +1,10 @@
+{
+  "name": "drupal/views_date_past_upcoming",
+  "description": "Views field and sort plugins that classify a date as past or upcoming.",
+  "type": "drupal-module",
+  "license": "GPL-2.0-or-later",
+  "require": {
+    "drupal/core": "^10"
+  },
+  "authors": []
+}
