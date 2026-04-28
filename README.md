@@ -45,7 +45,7 @@ Add the repository to your project's `composer.json`:
 "repositories": [
   {
     "type": "vcs",
-    "url": "https://github.com/YOUR_GITHUB_USERNAME/views_date_past_upcoming"
+    "url": "https://github.com/GhentCDH/views_date_past_upcoming"
   }
 ]
 ```
