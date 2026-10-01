@@ -88,6 +88,21 @@ class DatePastUpcomingSort extends SortPluginBase implements ContainerFactoryPlu
     ];
   }
 
+
+  /**
+   * {@inheritdoc}
+   *
+   * The parent summary reads the 'order' option, which this sort removes.
+   */
+  public function adminSummary() {
+    $summary = $this->t('Upcoming first (soonest), then past (most recent)');
+    if (!empty($this->options['use_end_date'])) {
+      $summary .= ', ' . $this->t('by end date');
+    }
+    return $summary;
+  }
+
+  
   /**
    * {@inheritdoc}
    */
