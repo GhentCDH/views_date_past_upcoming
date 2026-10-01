@@ -82,7 +82,7 @@ class PastUpcoming extends FieldPluginBase implements PastUpcomingHandlerInterfa
     $options['label_upcoming'] = ['default' => 'Upcoming'];
     $options['label_past'] = ['default' => 'Past'];
     $options['label_ongoing'] = ['default' => ''];
-    $options['label_none'] = ['default' => ''];
+    $options['label_none'] = ['default' => 'Date unknown'];
 
     return $options;
   }
@@ -122,7 +122,7 @@ class PastUpcoming extends FieldPluginBase implements PastUpcomingHandlerInterfa
     $form['label_none'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Label when there is no date'),
-      '#description' => $this->t('Leave empty to output nothing, so the "No results behavior" settings of this field apply.'),
+      '#description' => $this->t('Shown when the item has no date. Leave empty to output nothing, so the "No results behavior" settings of this field apply.'),
       '#default_value' => $this->options['label_none'],
       '#weight' => -96,
     ];

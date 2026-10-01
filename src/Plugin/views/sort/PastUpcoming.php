@@ -97,7 +97,11 @@ class PastUpcoming extends SortPluginBase implements PastUpcomingHandlerInterfac
 
     $form['past_upcoming_rule'] = [
       '#type' => 'item',
-      '#markup' => $this->t('Upcoming items first (soonest first), then past items (most recent first), then items without a date. Items with an end date are past once the end date has passed; items with only a start date stay upcoming for the whole day of their start date.'),
+      '#markup' => '<p><strong>' . $this->t('This sort only changes the order of the rows; it does not show any labels or headings.') . '</strong></p>'
+      . '<p>' . $this->t('Order: upcoming items (soonest first), then past items (most recent first), then items without a date. Items with an end date are past once the end date has passed; items with only a start date stay upcoming for the whole day of their start date.') . '</p>'
+      . '<p>' . $this->t('To show headings such as "Upcoming" and "Past" above the groups:') . '</p>'
+      . '<ol><li>' . $this->t('Add the "@field" field and tick <em>Exclude from display</em>.', ['@field' => $this->definition['title'] ?? $this->t('(past/upcoming)')]) . '</li>'
+      . '<li>' . $this->t('Under <em>Format › Settings</em>, choose that field as the <em>Grouping field</em>.') . '</li></ol>',
     ];
   }
 

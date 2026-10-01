@@ -18,25 +18,3 @@ views.field.past_upcoming:
 views.sort.past_upcoming:
   type: views_sort
   label: 'Past/upcoming'
-
-views.field.date_past_upcoming:
-  type: views.field.past_upcoming
-  label: 'Past/upcoming (deprecated)'
-  mapping:
-    datetime_field_machinename:
-      type: string
-      label: 'Datetime field machine name'
-    use_end_date:
-      type: boolean
-      label: 'Use end date if available (no longer used)'
-
-views.sort.date_past_upcoming_sort:
-  type: views_sort
-  label: 'Past/upcoming (deprecated)'
-  mapping:
-    datetime_field_machinename:
-      type: string
-      label: 'Datetime field machine name'
-    use_end_date:
-      type: boolean
-      label: 'Use end date if available (no longer used)'

@@ -28,17 +28,27 @@ Outputs a label for each row.
 | Label for upcoming dates | *Upcoming* | |
 | Label for past dates | *Past* | |
 | Label for ongoing items | *(empty)* | Leave empty to use the upcoming label. |
-| Label when there is no date | *(empty)* | Leave empty to output nothing, so the field's *No results behavior* applies (e.g. "Hide if empty"). |
+| Label when there is no date | *Date unknown* | Leave empty to output nothing, so the field's *No results behavior* applies (e.g. "Hide if empty"). |
 
 The token `{{ <field id>__status }}` holds the status as a machine name (`upcoming`, `ongoing`, `past` or `none`). This is useful for CSS classes in *Rewrite results*.
 
 ### Sort: (past/upcoming)
 
-The order is fixed and cannot be exposed:
+The sort only changes the order of the rows; it does not show any labels or headings. The order is fixed and cannot be exposed:
 
 1. **Upcoming and ongoing** items, by start date, soonest first.
 2. **Past** items, by end date (or start date when there is no end date), most recent first.
 3. Items **without a date**, in the order of the next sort criterion (e.g. add a title sort after it).
+
+### Showing headings (Upcoming / Past / Date unknown)
+
+Combine the sort with the field:
+
+1. Add the **"&lt;Field label&gt; (past/upcoming)"** sort.
+2. Add the **"&lt;Field label&gt; (past/upcoming)"** field and tick *Exclude from display*.
+3. Under **Format › Settings**, choose that field as the *Grouping field*.
+
+The groups appear in the order of the sort: Upcoming, Past, Date unknown. If you set a label for ongoing items, an "Ongoing" group appears above "Upcoming". Ongoing items started earliest, so they are sorted first.
 
 ### Notes
 
@@ -54,14 +64,13 @@ The output depends on the current time. The module limits the cache lifetime of 
 
 ## Upgrading from 1.x
 
-Version 1.x provided "Date Past/Upcoming" handlers in the *Custom Global* group, where you typed the field's machine name. Run the database updates:
+Version 1.x provided "Date Past/Upcoming" handlers in the *Custom Global* group, where you typed the field's machine name. These handlers have been removed. Run the database updates right after deploying the code, before importing configuration (`drush deploy` does this in the right order):
 
 ```bash
 drush updatedb
-drush config:export
 ```
 
-This converts existing views to the new field-based handlers. The old handlers still work but are marked *(deprecated)* and will be removed in a future major version.
+This converts existing views to the new field-based handlers.
 
 Behaviour changes:
 - The *Use end date if available* option is gone: the end date is always used when it is present.

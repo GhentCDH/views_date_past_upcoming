@@ -8,7 +8,7 @@
 use Drupal\views\Entity\View;
 
 /**
- * Converts the deprecated "Custom Global" handlers to field-based handlers.
+ * Converts the 1.x "Custom Global" handlers to field-based handlers.
  */
 function views_date_past_upcoming_post_update_convert_legacy_handlers() {
   $views_data = \Drupal::service('views.views_data');

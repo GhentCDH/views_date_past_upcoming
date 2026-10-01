@@ -89,10 +89,14 @@ class PastUpcomingTest extends KernelTestBase {
       'tomorrow' => 'Upcoming',
     ], $labels);
 
-    // Without an ongoing label, ongoing items are upcoming; without a "no
-    // date" label nothing is output.
+    // By default, ongoing items are upcoming and items without a date are
+    // "Date unknown".
     $labels = $this->renderLabels('field_when');
     $this->assertSame('Upcoming', $labels['running']);
+    $this->assertSame('Date unknown', $labels['no_date']);
+
+    // An empty "no date" label outputs nothing.
+    $labels = $this->renderLabels('field_when', ['label_none' => '']);
     $this->assertSame('', $labels['no_date']);
   }
 
@@ -216,20 +220,16 @@ class PastUpcomingTest extends KernelTestBase {
   }
 
   /**
-   * Tests the deprecated handlers and their conversion.
+   * Tests the conversion of 1.x "Custom Global" handlers.
+   *
+   * @see views_date_past_upcoming_post_update_convert_legacy_handlers()
    */
-  public function testLegacyHandlers(): void {
-    $this->createEvents('field_when', [
-      'no_date' => NULL,
-      'ended_this_morning' => ['2026-10-01T07:00:00', '2026-10-01T10:00:00'],
-      'tomorrow' => ['2026-10-02T08:00:00', '2026-10-02T10:00:00'],
-    ]);
-
+  public function testLegacyConversion(): void {
     $legacy = [
       'datetime_field_machinename' => 'field_when',
       'use_end_date' => FALSE,
     ];
-    View::create([
+    $view = View::create([
       'id' => 'legacy',
       'base_table' => 'node_field_data',
       'base_field' => 'nid',
@@ -244,6 +244,7 @@ class PastUpcomingTest extends KernelTestBase {
                 'table' => 'views',
                 'field' => 'date_past_upcoming',
                 'plugin_id' => 'date_past_upcoming',
+                'label_past' => 'Over',
               ] + $legacy,
             ],
             'sorts' => [
@@ -254,32 +255,31 @@ class PastUpcomingTest extends KernelTestBase {
                 'plugin_id' => 'date_past_upcoming_sort',
               ] + $legacy,
             ],
-            'pager' => ['type' => 'none', 'options' => ['offset' => 0]],
           ],
         ],
       ],
-    ])->save();
-
-    $view = Views::getView('legacy');
-    $view->execute();
-    $titles = array_map(fn ($row) => $row->_entity->label(), $view->result);
-    $this->assertSame(['tomorrow', 'ended_this_morning', 'no_date'], $titles);
+    ]);
+    // The 1.x options no longer have a schema, so write the view directly to
+    // the config storage, like existing 1.x configuration.
+    $this->container->get('config.storage')->write('views.view.legacy', $view->toArray());
 
     \Drupal::moduleHandler()->loadInclude('views_date_past_upcoming', 'php', 'views_date_past_upcoming.post_update');
     views_date_past_upcoming_post_update_convert_legacy_handlers();
 
-    $display = View::load('legacy')->getDisplay('default');
-    $field = $display['display_options']['fields']['date_past_upcoming'];
-    $this->assertSame('node__field_when', $field['table']);
-    $this->assertSame('field_when_past_upcoming', $field['field']);
-    $this->assertSame('past_upcoming', $field['plugin_id']);
-    $this->assertArrayNotHasKey('datetime_field_machinename', $field);
-    $this->assertSame('past_upcoming', $display['display_options']['sorts']['date_past_upcoming_sort']['plugin_id']);
-
-    $view = Views::getView('legacy');
-    $view->execute();
-    $titles = array_map(fn ($row) => $row->_entity->label(), $view->result);
-    $this->assertSame(['tomorrow', 'ended_this_morning', 'no_date'], $titles);
+    $options = View::load('legacy')->getDisplay('default')['display_options'];
+    $this->assertSame([
+      'id' => 'date_past_upcoming',
+      'table' => 'node__field_when',
+      'field' => 'field_when_past_upcoming',
+      'plugin_id' => 'past_upcoming',
+      'label_past' => 'Over',
+    ], $options['fields']['date_past_upcoming']);
+    $this->assertSame([
+      'id' => 'date_past_upcoming_sort',
+      'table' => 'node__field_when',
+      'field' => 'field_when_past_upcoming',
+      'plugin_id' => 'past_upcoming',
+    ], $options['sorts']['date_past_upcoming_sort']);
   }
 
   /**

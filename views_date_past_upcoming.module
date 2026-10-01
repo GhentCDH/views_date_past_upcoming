@@ -45,38 +45,17 @@ function views_date_past_upcoming_field_views_data_alter(array &$data, FieldStor
     $data[$table_alias][$field_name . '_past_upcoming'] = [
       'group' => $table_data[$field_name]['group'],
       'title' => t('@label (past/upcoming)', ['@label' => $table_data[$field_name]['title']]),
-      'help' => t('Whether the date is upcoming or in the past. Items with an end date are past once the end date has passed; items with only a start date stay upcoming for the whole day.'),
-      'field' => ['id' => 'past_upcoming', 'click sortable' => FALSE] + $definition,
-      'sort' => ['id' => 'past_upcoming'] + $definition,
+      'field' => [
+        'id' => 'past_upcoming',
+        'help' => t('Shows whether the date is upcoming, past or unknown. Items with an end date are past once the end date has passed; items with only a start date stay upcoming for the whole day.'),
+        'click sortable' => FALSE,
+      ] + $definition,
+      'sort' => [
+        'id' => 'past_upcoming',
+        'help' => t('Orders rows: upcoming first, then past, then no date. Order only – add the matching (past/upcoming) field to show labels or group headings.'),
+      ] + $definition,
     ];
   }
-}
-
-/**
- * Implements hook_views_data().
- */
-function views_date_past_upcoming_views_data(): array {
-  // Deprecated handlers, kept so existing views keep working. Existing views
-  // are converted by
-  // views_date_past_upcoming_post_update_convert_legacy_handlers().
-  $data['views']['date_past_upcoming'] = [
-    'title' => t('Date Past/Upcoming (deprecated)'),
-    'help' => t('Deprecated: use the "(past/upcoming)" field of the date field instead.'),
-    'field' => [
-      'id' => 'date_past_upcoming',
-      'click sortable' => FALSE,
-    ],
-  ];
-
-  $data['views']['date_past_upcoming_sort'] = [
-    'title' => t('Date Past/Upcoming Sort (deprecated)'),
-    'help' => t('Deprecated: use the "(past/upcoming)" sort of the date field instead.'),
-    'sort' => [
-      'id' => 'date_past_upcoming_sort',
-    ],
-  ];
-
-  return $data;
 }
 
 /**
