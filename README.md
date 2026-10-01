@@ -1,39 +1,79 @@
 # views_date_past_upcoming
 
-A lightweight Drupal module — no configuration forms, no schema, no custom entities — that provides two Views plugins for classifying a date field as **past** or **upcoming** relative to the current day.
+A lightweight Drupal module — no configuration forms, no custom entities — that adds a **past/upcoming** field and sort to every datetime and date range field in Views.
 
-> **Database support**: the sort plugin has only been tested on MySQL. Code paths exist for PostgreSQL and SQLite, but they are untested and may not work correctly without further adjustments.
+## How items are classified
+
+| Data on the row | Past when… |
+|---|---|
+| Start and end date | the end date/time has passed |
+| Start date only | the start day is over (it stays upcoming for the whole day) |
+| Date-only field (no time) | the end date (or start date) is before today |
+| No date at all | neither: these rows are "no date" |
+
+"Now" and "start of today" are computed in the site or user timezone. "Now" is rounded down to the minute.
+
+Items with an end date that have started but not ended yet are **ongoing**. They count as upcoming, and the field can give them their own label.
 
 ## Plugins
 
-### Field: Date Past/Upcoming
+Both plugins are available for every configurable `datetime` and `daterange` field. In the Views UI they appear in the field's group as **"&lt;Field label&gt; (past/upcoming)"**. They work through relationships too.
 
-A computed Views field that reads a datetime (or date range) field from each row's entity and outputs a configurable label — by default **Past** or **Upcoming**.
+### Field: (past/upcoming)
 
-**Options**
+Outputs a label for each row.
 
-| Option | Description |
-|---|---|
-| Datetime machine name | Machine name of the date field to evaluate (e.g. `field_event_date`). |
-| Use end date if available | For date range fields: evaluate the end date instead of the start date. |
-| Label for past dates | Output label when the date is before today (default: *Past*). |
-| Label for upcoming dates | Output label when the date is today or later (default: *Upcoming*). |
+| Option | Default | Description |
+|---|---|---|
+| Label for upcoming dates | *Upcoming* | |
+| Label for past dates | *Past* | |
+| Label for ongoing items | *(empty)* | Leave empty to use the upcoming label. |
+| Label when there is no date | *(empty)* | Leave empty to output nothing, so the field's *No results behavior* applies (e.g. "Hide if empty"). |
 
-### Sort: Date Past/Upcoming Sort
+The token `{{ <field id>__status }}` holds the status as a machine name (`upcoming`, `ongoing`, `past` or `none`). This is useful for CSS classes in *Rewrite results*.
 
-A custom sort that orders rows so that upcoming dates appear first (ascending, soonest first), followed by past dates (descending, most recent first). The sort direction is fixed and cannot be exposed to end users.
+### Sort: (past/upcoming)
 
-**Options**
+The order is fixed and cannot be exposed:
 
-| Option | Description |
-|---|---|
-| Datetime field machine name | Machine name of the date field to sort by. |
-| Use end date if available | For date range fields: sort by end date instead of start date. |
+1. **Upcoming and ongoing** items, by start date, soonest first.
+2. **Past** items, by end date (or start date when there is no end date), most recent first.
+3. Items **without a date**, in the order of the next sort criterion (e.g. add a title sort after it).
+
+### Notes
+
+- Only the first value of a multi-value date field is evaluated, so multi-value fields don't produce duplicate rows.
+- Base fields (date fields defined in code rather than in the UI) are not supported, because Views has no field table for them.
+- If the view returns no rows at all, Views' own **No results behavior** area applies.
+
+## Caching
+
+The output depends on the current time. The module limits the cache lifetime of the rendered view to the moment the first row changes from upcoming to past (or from upcoming to ongoing), and adds the `timezone` cache context. This works with Views caching, the render cache and the Dynamic Page Cache.
+
+**Internal Page Cache** (anonymous users) ignores the cache lifetime. On sites where anonymous visitors see these views, either disable the `page_cache` module, or clear the cache regularly (e.g. nightly from cron).
+
+## Upgrading from 1.x
+
+Version 1.x provided "Date Past/Upcoming" handlers in the *Custom Global* group, where you typed the field's machine name. Run the database updates:
+
+```bash
+drush updatedb
+drush config:export
+```
+
+This converts existing views to the new field-based handlers. The old handlers still work but are marked *(deprecated)* and will be removed in a future major version.
+
+Behaviour changes:
+- The *Use end date if available* option is gone: the end date is always used when it is present.
+- Rows without a date are now always sorted last. On MySQL they used to appear first.
+- Dates are now evaluated in the correct timezone.
 
 ## Requirements
 
-- Drupal 10 or higher
-- `drupal:views` module
+- Drupal 10 or 11
+- `drupal:views` and `drupal:datetime` (and `drupal:datetime_range` for date range fields)
+
+Tested on MySQL, PostgreSQL and SQLite.
 
 ## Installation
 
@@ -69,9 +109,15 @@ Download or clone this repository into `web/modules/custom/views_date_past_upcom
 ## Configuration
 
 1. Open a View and click **Add** next to **Fields** (or **Sort criteria**).
-2. Under the group **Custom Global**, select **Date Past/Upcoming** (field) or **Date Past/Upcoming Sort** (sort).
-3. Configure the machine name of the datetime field you want to evaluate.
-4. Optionally adjust the labels or enable end-date evaluation for date range fields.
+2. Search for your date field and select **"&lt;Field label&gt; (past/upcoming)"**.
+3. For the field, optionally adjust the labels.
+
+## Running the tests
+
+```bash
+cd web
+SIMPLETEST_DB=sqlite://localhost//tmp/test.sqlite ../vendor/bin/phpunit -c core/phpunit.xml.dist modules/custom/views_date_past_upcoming/tests
+```
 
 ## License
 

@@ -5,31 +5,106 @@
  * Hooks for the views_date_past_upcoming module.
  */
 
+use Drupal\Core\Cache\Cache;
+use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
+use Drupal\field\FieldStorageConfigInterface;
+use Drupal\views\Plugin\views\cache\CachePluginBase;
+use Drupal\views\ViewExecutable;
+use Drupal\views_date_past_upcoming\Plugin\views\PastUpcomingHandlerInterface;
+
+/**
+ * Implements hook_field_views_data_alter().
+ *
+ * Adds a "(past/upcoming)" field and sort to every datetime and daterange
+ * field.
+ */
+function views_date_past_upcoming_field_views_data_alter(array &$data, FieldStorageConfigInterface $field_storage): void {
+  $field_type = $field_storage->getType();
+  if (!in_array($field_type, ['datetime', 'daterange'], TRUE)) {
+    return;
+  }
+
+  $field_name = $field_storage->getName();
+  $entity_type_id = $field_storage->getTargetEntityTypeId();
+  $datetime_type = $field_storage->getSetting('datetime_type') ?? DateTimeItem::DATETIME_TYPE_DATETIME;
+
+  foreach ($data as $table_alias => $table_data) {
+    // Only the current values, not the revision tables.
+    if ($table_alias !== "{$entity_type_id}__{$field_name}" || !isset($table_data[$field_name])) {
+      continue;
+    }
+
+    $definition = [
+      'field_name' => $field_name,
+      'entity_type' => $entity_type_id,
+      'start_column' => $field_name . '_value',
+      'end_column' => $field_type === 'daterange' ? $field_name . '_end_value' : NULL,
+      'datetime_type' => $datetime_type,
+    ];
+
+    $data[$table_alias][$field_name . '_past_upcoming'] = [
+      'group' => $table_data[$field_name]['group'],
+      'title' => t('@label (past/upcoming)', ['@label' => $table_data[$field_name]['title']]),
+      'help' => t('Whether the date is upcoming or in the past. Items with an end date are past once the end date has passed; items with only a start date stay upcoming for the whole day.'),
+      'field' => ['id' => 'past_upcoming', 'click sortable' => FALSE] + $definition,
+      'sort' => ['id' => 'past_upcoming'] + $definition,
+    ];
+  }
+}
 
 /**
  * Implements hook_views_data().
  */
 function views_date_past_upcoming_views_data(): array {
-  $data['views']['table']['group'] = t('Custom Global');
-  $data['views']['table']['join'] = [
-    '#global' => [],
-  ];
-
+  // Deprecated handlers, kept so existing views keep working. Existing views
+  // are converted by
+  // views_date_past_upcoming_post_update_convert_legacy_handlers().
   $data['views']['date_past_upcoming'] = [
-    'title' => t('Date Past/Upcoming'),
-    'help' => t('Calculates whether a date is upcoming or in the past.'),
+    'title' => t('Date Past/Upcoming (deprecated)'),
+    'help' => t('Deprecated: use the "(past/upcoming)" field of the date field instead.'),
     'field' => [
       'id' => 'date_past_upcoming',
+      'click sortable' => FALSE,
     ],
   ];
 
   $data['views']['date_past_upcoming_sort'] = [
-    'title' => t('Date Past/Upcoming Sort'),
-    'help' => t('Sort by future dates first (ascending), then past dates (descending).'),
+    'title' => t('Date Past/Upcoming Sort (deprecated)'),
+    'help' => t('Deprecated: use the "(past/upcoming)" sort of the date field instead.'),
     'sort' => [
       'id' => 'date_past_upcoming_sort',
     ],
   ];
 
   return $data;
+}
+
+/**
+ * Implements hook_views_post_render().
+ *
+ * Limits the max-age of the rendered view to the moment the first row changes
+ * from upcoming to past, so cached output never shows outdated labels or
+ * order.
+ */
+function views_date_past_upcoming_views_post_render(ViewExecutable $view, array &$output, CachePluginBase $cache): void {
+  $handlers = array_filter(
+    array_merge($view->field ?? [], $view->sort ?? []),
+    static fn ($handler) => $handler instanceof PastUpcomingHandlerInterface,
+  );
+  if (!$handlers) {
+    return;
+  }
+
+  /** @var \Drupal\views_date_past_upcoming\PastUpcomingClassifier $classifier */
+  $classifier = \Drupal::service('views_date_past_upcoming.classifier');
+  $max_age = Cache::PERMANENT;
+  foreach ($handlers as $handler) {
+    foreach ($view->result as $row) {
+      [$start, $end] = $handler->getDateValues($row);
+      $max_age = Cache::mergeMaxAges($max_age, $classifier->getMaxAge($start, $end, $handler->getDatetimeType()));
+    }
+  }
+
+  $output['#cache']['max-age'] = Cache::mergeMaxAges($output['#cache']['max-age'] ?? Cache::PERMANENT, $max_age);
+  $output['#cache']['contexts'] = Cache::mergeContexts($output['#cache']['contexts'] ?? [], ['timezone']);
 }

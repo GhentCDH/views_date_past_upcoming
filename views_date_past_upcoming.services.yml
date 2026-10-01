@@ -1,0 +1,4 @@
+services:
+  views_date_past_upcoming.classifier:
+    class: Drupal\views_date_past_upcoming\PastUpcomingClassifier
+    arguments: ['@datetime.time']

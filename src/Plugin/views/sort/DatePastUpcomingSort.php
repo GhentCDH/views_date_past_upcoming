@@ -2,49 +2,32 @@
 
 namespace Drupal\views_date_past_upcoming\Plugin\views\sort;
 
-use Drupal\Component\Plugin\PluginManagerInterface;
-use Drupal\Core\Database\Connection;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
-use Drupal\views\Plugin\views\sort\SortPluginBase;
-use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\views_date_past_upcoming\Plugin\views\LegacyPastUpcomingHandlerTrait;
 
 /**
- * Sorts results so that upcoming dates appear first, past dates last.
+ * Deprecated "Custom Global" past/upcoming sort.
  *
- * Upcoming dates are ordered ascending (soonest first); past dates follow
- * in descending order (most recent first). The sort direction and expose
- * controls from the parent are removed because the ordering logic is fixed.
+ * Takes the machine name of the date field as an option. Existing views are
+ * converted to the field-based handler by
+ * views_date_past_upcoming_post_update_convert_legacy_handlers().
  *
- * Uses a CASE expression in SQL to assign a numeric sort key:
- * - upcoming: epoch timestamp of the date (ascending = soonest first)
- * - past: 10000000000 - epoch timestamp (so most recent past sorts before older)
+ * Deprecated: use the "(past/upcoming)" sort of the date field instead. This
+ * handler will be removed in a future major version.
  *
  * @ViewsSort("date_past_upcoming_sort")
  */
-class DatePastUpcomingSort extends SortPluginBase implements ContainerFactoryPluginInterface {
+class DatePastUpcomingSort extends PastUpcoming {
 
-  public function __construct(
-    array $configuration,
-    string $plugin_id,
-    mixed $plugin_definition,
-    protected PluginManagerInterface $joinManager,
-    protected Connection $database,
-  ) {
-    parent::__construct($configuration, $plugin_id, $plugin_definition);
-  }
+  use LegacyPastUpcomingHandlerTrait;
 
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition): static {
-    return new static(
-      $configuration,
-      $plugin_id,
-      $plugin_definition,
-      $container->get('plugin.manager.views.join'),
-      $container->get('database'),
-    );
+  public function query() {
+    if ($this->resolveLegacyDefinition('sort')) {
+      parent::query();
+    }
   }
 
   /**
@@ -53,12 +36,9 @@ class DatePastUpcomingSort extends SortPluginBase implements ContainerFactoryPlu
   protected function defineOptions() {
     $options = parent::defineOptions();
 
-    foreach (['order', 'expose', 'exposed'] as $key) {
-      unset($options[$key]);
-    }
-
     $options['datetime_field_machinename'] = ['default' => ''];
-    $options['use_end_date'] = ['default' => 0];
+    // No longer used: the end date is always used when it is present.
+    $options['use_end_date'] = ['default' => FALSE];
 
     return $options;
   }
@@ -69,97 +49,14 @@ class DatePastUpcomingSort extends SortPluginBase implements ContainerFactoryPlu
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
-    // The sort order is fixed; the expose control is irrelevant.
-    unset($form['order'], $form['expose_button']);
-
     $form['datetime_field_machinename'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Datetime field machine name'),
+      '#description' => $this->t('Deprecated: add the "(past/upcoming)" sort of the date field instead.'),
       '#required' => TRUE,
-      '#default_value' => $this->options['datetime_field_machinename'] ?? '',
-      '#description' => $this->t('Example: field_time_period (without node__ prefix)'),
+      '#default_value' => $this->options['datetime_field_machinename'],
+      '#weight' => -101,
     ];
-
-    $form['use_end_date'] = [
-      '#type' => 'checkbox',
-      '#title' => $this->t('Use end date if available'),
-      '#default_value' => $this->options['use_end_date'] ?? FALSE,
-      '#description' => $this->t('For date range fields, sort by end date instead of start date.'),
-    ];
-  }
-
-
-  /**
-   * {@inheritdoc}
-   *
-   * The parent summary reads the 'order' option, which this sort removes.
-   */
-  public function adminSummary() {
-    $summary = $this->t('Upcoming first (soonest), then past (most recent)');
-    if (!empty($this->options['use_end_date'])) {
-      $summary .= ', ' . $this->t('by end date');
-    }
-    return $summary;
-  }
-
-  
-  /**
-   * {@inheritdoc}
-   */
-  public function query() {
-    $this->ensureMyTable();
-
-    $field = $this->options['datetime_field_machinename'];
-
-    if (empty($field)) {
-      return;
-    }
-
-    $entity_type = $this->view->getBaseEntityType()->id();
-    $field_table = "{$entity_type}__{$field}";
-
-    $configuration = [
-      'table' => $field_table,
-      'field' => 'entity_id',
-      'left_table' => $entity_type . '_field_data',
-      'left_field' => $entity_type === 'node' ? 'nid' : 'id',
-    ];
-
-    $join = $this->joinManager->createInstance('standard', $configuration);
-    $alias = $this->query->addRelationship($field_table, $join, $entity_type . '_field_data');
-
-    $column_suffix = $this->options['use_end_date'] ? 'end_value' : 'value';
-    $column = "{$alias}.{$field}_{$column_suffix}";
-
-    switch ($this->database->driver()) {
-      case 'pgsql':
-        $now = 'CURRENT_TIMESTAMP';
-        $epoch = "EXTRACT(EPOCH FROM {$column})";
-        break;
-
-      case 'sqlite':
-        $now = "datetime('now')";
-        $epoch = "strftime('%s', {$column})";
-        break;
-
-      default:
-        $now = 'NOW()';
-        $epoch = "UNIX_TIMESTAMP({$column})";
-    }
-
-    // Upcoming dates sort by their epoch value (ascending = soonest first).
-    // Past dates sort by their inverted epoch so the most recent past date
-    // appears before older past dates.
-    $formula = "
-      CASE
-        WHEN {$column} >= {$now}
-          THEN {$epoch}
-        ELSE
-          10000000000 - {$epoch}
-      END
-    ";
-
-    $this->query->addOrderBy(NULL, $formula, 'ASC', 'date_past_upcoming_order');
   }
 
 }
